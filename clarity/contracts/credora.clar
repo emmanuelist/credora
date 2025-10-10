@@ -25,24 +25,33 @@
 
 ;; DATA STORAGE
 
-(define-map lender_info principal {
-  balance: uint,
-  locked_block: uint,
-  unlock_block: uint
-})
+(define-map lender_info
+  principal
+  {
+    balance: uint,
+    locked_block: uint,
+    unlock_block: uint,
+  }
+)
 
-(define-map active_loans principal {
-  amount: uint,
-  due_block: uint,
-  interest_rate: uint,
-  issued_block: uint
-})
+(define-map active_loans
+  principal
+  {
+    amount: uint,
+    due_block: uint,
+    interest_rate: uint,
+    issued_block: uint,
+  }
+)
 
-(define-map account_data_map principal {
-  total_loans: uint,
-  on_time_loans: uint,
-  late_loans: uint
-})
+(define-map account_data_map
+  principal
+  {
+    total_loans: uint,
+    on_time_loans: uint,
+    late_loans: uint,
+  }
+)
 
 (define-data-var admin principal tx-sender)
 (define-data-var total_lending_pool uint u0)
@@ -71,16 +80,49 @@
 ;; Calculates 3-month average sBTC balance across historical snapshots
 (define-private (get-average-balance (who principal))
   (let (
-    (stacks_stacks_id_header_hash_1 (unwrap! (get-stacks-block-info? id-header-hash (- stacks-block-height (convert-days-to-blocks u1))) u0))
-    (stacks_stacks_id_header_hash_2 (unwrap! (get-stacks-block-info? id-header-hash (- stacks-block-height (convert-days-to-blocks u31))) u0))
-    (stacks_stacks_id_header_hash_3 (unwrap! (get-stacks-block-info? id-header-hash (- stacks-block-height (convert-days-to-blocks u61))) u0))
-  )
-    (/ 
-      (+ 
-        (at-block stacks_stacks_id_header_hash_1 (unwrap! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance who) u0))
-        (at-block stacks_stacks_id_header_hash_2 (unwrap! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance who) u0))
-        (at-block stacks_stacks_id_header_hash_3 (unwrap! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance who) u0))
-      ) 
+      (stacks_stacks_id_header_hash_1 (unwrap!
+        (get-stacks-block-info? id-header-hash
+          (- stacks-block-height (convert-days-to-blocks u1))
+        )
+        u0
+      ))
+      (stacks_stacks_id_header_hash_2 (unwrap!
+        (get-stacks-block-info? id-header-hash
+          (- stacks-block-height (convert-days-to-blocks u31))
+        )
+        u0
+      ))
+      (stacks_stacks_id_header_hash_3 (unwrap!
+        (get-stacks-block-info? id-header-hash
+          (- stacks-block-height (convert-days-to-blocks u61))
+        )
+        u0
+      ))
+    )
+    (/
+      (+
+        (at-block stacks_stacks_id_header_hash_1
+          (unwrap!
+            (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+              get-balance who
+            )
+            u0
+          ))
+        (at-block stacks_stacks_id_header_hash_2
+          (unwrap!
+            (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+              get-balance who
+            )
+            u0
+          ))
+        (at-block stacks_stacks_id_header_hash_3
+          (unwrap!
+            (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+              get-balance who
+            )
+            u0
+          ))
+      )
       u3
     )
   )
@@ -100,7 +142,7 @@
 
 ;; Scores on-chain activity (0-300 pts)
 (define-private (activity-score (average_balance uint))
-  (begin 
+  (begin
     (asserts! (> average_balance u0) u0)
     (asserts! (>= average_balance tier_0_limit) u100)
     (asserts! (>= average_balance tier_1_limit) u220)
@@ -112,7 +154,11 @@
 )
 
 ;; Scores repayment history (0-700 pts)
-(define-private (repayment-score (total_loans uint) (on_time_loans uint) (late_loans uint))
+(define-private (repayment-score
+    (total_loans uint)
+    (on_time_loans uint)
+    (late_loans uint)
+  )
   (if (> on_time_loans u0)
     (if (< total_loans u5)
       (/ (* on_time_loans u700) (+ total_loans u5))
@@ -125,26 +171,25 @@
 ;; Updates borrower stats and marks loan as paid
 (define-private (check-for-late-payment-and-update-data-after-payment (who principal))
   (let (
-    (account_data (default-to 
-      { 
+      (account_data (default-to {
         total_loans: u0,
         on_time_loans: u0,
-        late_loans: u0
+        late_loans: u0,
       }
-      (map-get? account_data_map who)
-    ))
-    (due_block (default-to u0 (get due_block (map-get? active_loans who))))
-  ) 
+        (map-get? account_data_map who)
+      ))
+      (due_block (default-to u0 (get due_block (map-get? active_loans who))))
+    )
     (if (<= stacks-block-height due_block)
       (map-set account_data_map who {
         total_loans: (get total_loans account_data),
         on_time_loans: (+ (get on_time_loans account_data) u1),
-        late_loans: (get late_loans account_data)
+        late_loans: (get late_loans account_data),
       })
       (map-set account_data_map who {
         total_loans: (get total_loans account_data),
         on_time_loans: (get on_time_loans account_data),
-        late_loans: (+ (get late_loans account_data) u1)
+        late_loans: (+ (get late_loans account_data) u1),
       })
     )
     (map-delete active_loans who)
@@ -152,138 +197,150 @@
 )
 
 ;; Validates borrower eligibility via credit scoring algorithm
-(define-private (loan-eligibility 
-  (who principal)
-  (account_data {
-    total_loans: uint,
-    on_time_loans: uint,
-    late_loans: uint
-  })
-  (amount uint)
-)
-  (let (
-    (total_loans (get total_loans account_data))
-    (on_time_loans (get on_time_loans account_data))
-    (late_loans (get late_loans account_data))
-    (average_balance (get-average-balance who))
+(define-private (loan-eligibility
+    (who principal)
+    (account_data {
+      total_loans: uint,
+      on_time_loans: uint,
+      late_loans: uint,
+    })
+    (amount uint)
   )
+  (let (
+      (total_loans (get total_loans account_data))
+      (on_time_loans (get on_time_loans account_data))
+      (late_loans (get late_loans account_data))
+      (average_balance (get-average-balance who))
+    )
     (if (is-eq total_loans u0)
       (begin
         (asserts! (is-eq (+ late_loans on_time_loans) total_loans) false)
         (asserts! (>= average_balance amount) false)
-        (asserts! (>= (loan-limit (+ (activity-score average_balance) (repayment-score total_loans on_time_loans late_loans))) amount) false)
-        (map-set account_data_map who { 
-          total_loans: total_loans,
-          on_time_loans: on_time_loans,
-          late_loans: late_loans
-        })
-        true
-      )
-      (begin 
-        (asserts! (is-eq (+ late_loans on_time_loans) total_loans) false)
-        (asserts! (>= average_balance amount) false)
-        (asserts! (>= (loan-limit (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance))) amount) false)
+        (asserts!
+          (>=
+            (loan-limit (+ (activity-score average_balance)
+              (repayment-score total_loans on_time_loans late_loans)
+            ))
+            amount
+          )
+          false
+        )
         (map-set account_data_map who {
           total_loans: total_loans,
           on_time_loans: on_time_loans,
-          late_loans: late_loans
+          late_loans: late_loans,
+        })
+        true
+      )
+      (begin
+        (asserts! (is-eq (+ late_loans on_time_loans) total_loans) false)
+        (asserts! (>= average_balance amount) false)
+        (asserts!
+          (>=
+            (loan-limit (+ (repayment-score total_loans on_time_loans late_loans)
+              (activity-score average_balance)
+            ))
+            amount
+          )
+          false
+        )
+        (map-set account_data_map who {
+          total_loans: total_loans,
+          on_time_loans: on_time_loans,
+          late_loans: late_loans,
         })
         true
       )
     )
-  ) 
+  )
 )
 
 ;; PUBLIC FUNCTIONS - Lending Pool
 
 ;; Deposit sBTC to earn yield
 (define-public (lend (amount uint))
-  (let (
-    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
-  ) 
+  (let ((lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender)))))
     (asserts! (>= amount u10000000) err_input_value_too_small)
-    (try! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer amount tx-sender (as-contract tx-sender) none))
-    (map-set lender_info tx-sender 
-      {
-        balance: (+ lender_balance amount), 
-        locked_block: stacks-block-height, 
-        unlock_block: (+ stacks-block-height (convert-days-to-blocks (var-get lock_duration_in_days)))
-      }
-    )
+    (try! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+      transfer amount tx-sender (as-contract tx-sender) none
+    ))
+    (map-set lender_info tx-sender {
+      balance: (+ lender_balance amount),
+      locked_block: stacks-block-height,
+      unlock_block: (+ stacks-block-height
+        (convert-days-to-blocks (var-get lock_duration_in_days))
+      ),
+    })
     (var-set total_lending_pool (+ (var-get total_lending_pool) amount))
     (print {
       event: "lend_sucessful",
       user: tx-sender,
-      amount: amount, 
+      amount: amount,
       locked_block: (default-to u0 (get locked_block (map-get? lender_info tx-sender))),
-      unlock_block: (default-to u0 (get unlock_block (map-get? lender_info tx-sender)))
+      unlock_block: (default-to u0 (get unlock_block (map-get? lender_info tx-sender))),
     })
     (ok true)
   )
 )
 
 ;; Withdraw sBTC plus accrued interest
-(define-public (withdraw (amount uint)) 
+(define-public (withdraw (amount uint))
   (let (
-    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
-    (unlock_block (default-to u0 (get unlock_block (map-get? lender_info tx-sender))))
-    (locked_block (default-to u0 (get locked_block (map-get? lender_info tx-sender))))
-    (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))))
-    (lender_pool_balance 
-      (if (> lender_balance u0)
-        (/ 
-          (* lender_balance contract_balance) 
+      (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
+      (unlock_block (default-to u0 (get unlock_block (map-get? lender_info tx-sender))))
+      (locked_block (default-to u0 (get locked_block (map-get? lender_info tx-sender))))
+      (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+        get-balance (as-contract tx-sender)
+      )))
+      (lender_pool_balance (if (> lender_balance u0)
+        (/ (* lender_balance contract_balance)
           (if (> (var-get total_lending_pool) u0)
             (var-get total_lending_pool)
             u1
-          )
-        )
+          ))
         u0
-      )
+      ))
     )
-  )
     (asserts! (> lender_balance u0) err_not_a_lender)
     (asserts! (<= amount lender_pool_balance) err_pool_share_exceeded)
     (asserts! (<= unlock_block stacks-block-height) err_funds_locked)
-    (try! (as-contract (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer amount tx-sender contract-caller none)))
-    (var-set total_lending_pool 
+    (try! (as-contract (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+      transfer amount tx-sender contract-caller none
+    )))
+    (var-set total_lending_pool
       (if (< lender_balance amount)
-        (+ 
-          (- (var-get total_lending_pool) lender_balance)
+        (+ (- (var-get total_lending_pool) lender_balance)
           (- lender_pool_balance amount)
         )
         (- (var-get total_lending_pool) amount)
-      )
-    )
+      ))
     (if (>= amount lender_balance)
       (if (is-eq amount lender_pool_balance)
         (map-delete lender_info tx-sender)
-        (map-set lender_info tx-sender 
-          {
-            balance: (- lender_pool_balance amount),
-            locked_block: locked_block,
-            unlock_block: unlock_block
-          }
-        )
+        (map-set lender_info tx-sender {
+          balance: (- lender_pool_balance amount),
+          locked_block: locked_block,
+          unlock_block: unlock_block,
+        })
       )
       (if (< lender_balance lender_pool_balance)
-        (map-set lender_info tx-sender 
-          {
-            balance: (- lender_pool_balance amount),
-            locked_block: locked_block,
-            unlock_block: unlock_block
-          }
-        )
-        (map-set lender_info tx-sender 
-          {
-            balance: (- lender_balance amount),
-            locked_block: locked_block,
-            unlock_block: unlock_block
-          }
-        )
+        (map-set lender_info tx-sender {
+          balance: (- lender_pool_balance amount),
+          locked_block: locked_block,
+          unlock_block: unlock_block,
+        })
+        (map-set lender_info tx-sender {
+          balance: (- lender_balance amount),
+          locked_block: locked_block,
+          unlock_block: unlock_block,
+        })
       )
     )
-    (print {event: "withdrawal_sucessful", user: tx-sender, amount: amount})
+    (print {
+      event: "withdrawal_sucessful",
+      user: tx-sender,
+      amount: amount,
+    })
     (ok true)
   )
 )
@@ -291,38 +348,50 @@
 ;; PUBLIC FUNCTIONS - Borrowing
 
 ;; Request uncollateralized loan based on credit score
-(define-public (apply-for-loan (amount uint)) 
+(define-public (apply-for-loan (amount uint))
   (let (
-    (account_data (default-to {
-      total_loans: u0,
-      on_time_loans: u0,
-      late_loans: u0
-    } (map-get? account_data_map tx-sender)))
-    (loan_duration_in_blocks (convert-days-to-blocks (var-get loan_duration_in_days)))
-  )
+      (account_data (default-to {
+        total_loans: u0,
+        on_time_loans: u0,
+        late_loans: u0,
+      }
+        (map-get? account_data_map tx-sender)
+      ))
+      (loan_duration_in_blocks (convert-days-to-blocks (var-get loan_duration_in_days)))
+    )
     (asserts! (> amount u0) err_input_value_too_small)
     (asserts! (loan-eligibility tx-sender account_data amount) err_not_eligible)
-    (asserts! (> (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))) amount) err_funds_not_available_now)
-    (try! (as-contract (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer amount tx-sender contract-caller none)))
+    (asserts!
+      (>
+        (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+          get-balance (as-contract tx-sender)
+        ))
+        amount
+      )
+      err_funds_not_available_now
+    )
+    (try! (as-contract (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+      transfer amount tx-sender contract-caller none
+    )))
     (map-set active_loans tx-sender {
       amount: amount,
       due_block: (+ stacks-block-height loan_duration_in_blocks),
       interest_rate: (var-get interest_rate_in_percent),
-      issued_block: stacks-block-height
+      issued_block: stacks-block-height,
     })
     (map-set account_data_map tx-sender {
       total_loans: (+ u1 (get total_loans account_data)),
       on_time_loans: (get on_time_loans account_data),
-      late_loans: (get late_loans account_data)
+      late_loans: (get late_loans account_data),
     })
     (print {
-      event: "loan_grant_sucessful", 
-      user: tx-sender, 
-      amount_to_repay: (repayment-amount-due tx-sender), 
-      amount: amount, 
-      due_block: (+ stacks-block-height loan_duration_in_blocks), 
-      interest_rate: (var-get interest_rate_in_percent), 
-      issued_block: stacks-block-height
+      event: "loan_grant_sucessful",
+      user: tx-sender,
+      amount_to_repay: (repayment-amount-due tx-sender),
+      amount: amount,
+      due_block: (+ stacks-block-height loan_duration_in_blocks),
+      interest_rate: (var-get interest_rate_in_percent),
+      issued_block: stacks-block-height,
     })
     (ok true)
   )
@@ -331,18 +400,26 @@
 ;; Repay loan and update credit history
 (define-public (repay-loan (who principal))
   (let (
-    (loan_data (default-to {
-      amount: u0,
-      due_block: u0,
-      interest_rate: u0,
-      issued_block: u0
-    } (map-get? active_loans who)))
-    (repayment_amount (repayment-amount-due who))
-  )
+      (loan_data (default-to {
+        amount: u0,
+        due_block: u0,
+        interest_rate: u0,
+        issued_block: u0,
+      }
+        (map-get? active_loans who)
+      ))
+      (repayment_amount (repayment-amount-due who))
+    )
     (asserts! (> (get amount loan_data) u0) err_not_eligible)
-    (try! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer repayment_amount tx-sender (as-contract tx-sender) none))
+    (try! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+      transfer repayment_amount tx-sender (as-contract tx-sender) none
+    ))
     (check-for-late-payment-and-update-data-after-payment who)
-    (print {event: "loan_repaid_sucessfully", user: tx-sender, amount: repayment_amount})
+    (print {
+      event: "loan_repaid_sucessfully",
+      user: tx-sender,
+      amount: repayment_amount,
+    })
     (ok true)
   )
 )
@@ -350,7 +427,7 @@
 ;; PUBLIC FUNCTIONS - Admin Controls
 
 (define-public (set-admin (who principal))
-  (begin  
+  (begin
     (asserts! (is-admin) err_not_admin)
     (ok (var-set admin who))
   )
@@ -384,23 +461,21 @@
 
 (define-read-only (get-withdrawal-limit (lender principal))
   (let (
-    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
-    (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))))
-    (lender_pool_balance 
-      (if (> lender_balance u0)
-        (/ 
-          (* lender_balance contract_balance) 
+      (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
+      (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+        get-balance (as-contract tx-sender)
+      )))
+      (lender_pool_balance (if (> lender_balance u0)
+        (/ (* lender_balance contract_balance)
           (if (> (var-get total_lending_pool) u0)
             (var-get total_lending_pool)
             u1
-          )
-        )
+          ))
         u0
-      )
+      ))
     )
-  )
     (asserts! (> lender_balance u0) err_not_a_lender)
-    (ok {withdrawal_limit: lender_pool_balance})
+    (ok { withdrawal_limit: lender_pool_balance })
   )
 )
 
@@ -408,27 +483,30 @@
   (ok {
     lock_duration_in_days: (var-get lock_duration_in_days),
     pool_size: (var-get total_lending_pool),
-    contract_balance: (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender)))
+    contract_balance: (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+      get-balance (as-contract tx-sender)
+    )),
   })
 )
 
 (define-read-only (get-lender-info)
   (let (
-    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
-    (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))))
-    (locked_block (default-to u0 (get locked_block (map-get? lender_info tx-sender))))
-    (unlock_block (default-to u0 (get unlock_block (map-get? lender_info tx-sender))))
-  )
+      (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
+      (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token
+        get-balance (as-contract tx-sender)
+      )))
+      (locked_block (default-to u0 (get locked_block (map-get? lender_info tx-sender))))
+      (unlock_block (default-to u0 (get unlock_block (map-get? lender_info tx-sender))))
+    )
     (ok {
       lender_balance: lender_balance,
-      lender_pool_balance:  
-        (if (> lender_balance u0)
-          (/ (* lender_balance contract_balance) (var-get total_lending_pool))
-          u0
-        ),
+      lender_pool_balance: (if (> lender_balance u0)
+        (/ (* lender_balance contract_balance) (var-get total_lending_pool))
+        u0
+      ),
       locked_block: locked_block,
       unlock_block: unlock_block,
-      time_in_pool_in_seconds: (/ (- stacks-block-height locked_block) (time-per-block))
+      time_in_pool_in_seconds: (/ (- stacks-block-height locked_block) (time-per-block)),
     })
   )
 )
@@ -437,9 +515,9 @@
 
 (define-read-only (repayment-amount-due (who principal))
   (let (
-    (amount (default-to u0 (get amount (map-get? active_loans who))))
-    (interest_rate (default-to u0 (get interest_rate (map-get? active_loans who))))
-  )
+      (amount (default-to u0 (get amount (map-get? active_loans who))))
+      (interest_rate (default-to u0 (get interest_rate (map-get? active_loans who))))
+    )
     (if (> interest_rate u0)
       (+ amount (/ (* amount interest_rate) u100))
       u0
@@ -449,70 +527,88 @@
 
 (define-read-only (get-loan-limit-info (who principal))
   (let (
-    (account_data (default-to {
-      total_loans: u0,
-      on_time_loans: u0,
-      late_loans: u0
-    } (map-get? account_data_map tx-sender)))
-    (total_loans (get total_loans account_data))
-    (on_time_loans (get on_time_loans account_data))
-    (late_loans (get late_loans account_data))
-    (average_balance (get-average-balance who))
-    (credit_score_limit (loan-limit (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance))))
-  )
-    (asserts! (is-eq total_loans (+ late_loans on_time_loans)) (ok {
-      credit_score: (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance)),
-      credit_score_limit: credit_score_limit,
-      average_balance: average_balance,
-      loan_limit: u0
-    }))
-    (asserts! (< average_balance credit_score_limit) (ok {
-      credit_score: (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance)),
-      credit_score_limit: credit_score_limit,
-      average_balance: average_balance,
-      loan_limit: credit_score_limit
-    }))
+      (account_data (default-to {
+        total_loans: u0,
+        on_time_loans: u0,
+        late_loans: u0,
+      }
+        (map-get? account_data_map tx-sender)
+      ))
+      (total_loans (get total_loans account_data))
+      (on_time_loans (get on_time_loans account_data))
+      (late_loans (get late_loans account_data))
+      (average_balance (get-average-balance who))
+      (credit_score_limit (loan-limit (+ (repayment-score total_loans on_time_loans late_loans)
+        (activity-score average_balance)
+      )))
+    )
+    (asserts! (is-eq total_loans (+ late_loans on_time_loans))
+      (ok {
+        credit_score: (+ (repayment-score total_loans on_time_loans late_loans)
+          (activity-score average_balance)
+        ),
+        credit_score_limit: credit_score_limit,
+        average_balance: average_balance,
+        loan_limit: u0,
+      })
+    )
+    (asserts! (< average_balance credit_score_limit)
+      (ok {
+        credit_score: (+ (repayment-score total_loans on_time_loans late_loans)
+          (activity-score average_balance)
+        ),
+        credit_score_limit: credit_score_limit,
+        average_balance: average_balance,
+        loan_limit: credit_score_limit,
+      })
+    )
     (ok {
-      credit_score: (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance)),
+      credit_score: (+ (repayment-score total_loans on_time_loans late_loans)
+        (activity-score average_balance)
+      ),
       credit_score_limit: credit_score_limit,
       average_balance: average_balance,
-      loan_limit: average_balance
+      loan_limit: average_balance,
     })
   )
 )
 
 (define-read-only (get-loan-eligibility-info (who principal))
   (let (
-    (account_data (default-to {
-      total_loans: u0,
-      on_time_loans: u0,
-      late_loans: u0
-    } (map-get? account_data_map who)))
-    (total_loans (get total_loans account_data))
-    (on_time_loans (get on_time_loans account_data))
-    (late_loans (get late_loans account_data))
-    (average_balance (get-average-balance who))
-    (credit_score_limit (loan-limit (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance))))
-  )
+      (account_data (default-to {
+        total_loans: u0,
+        on_time_loans: u0,
+        late_loans: u0,
+      }
+        (map-get? account_data_map who)
+      ))
+      (total_loans (get total_loans account_data))
+      (on_time_loans (get on_time_loans account_data))
+      (late_loans (get late_loans account_data))
+      (average_balance (get-average-balance who))
+      (credit_score_limit (loan-limit (+ (repayment-score total_loans on_time_loans late_loans)
+        (activity-score average_balance)
+      )))
+    )
     (if (> total_loans (+ on_time_loans late_loans))
       (ok {
         message: "address has an unpaid loan",
         loan_limit: u0,
         interest_rate: (var-get interest_rate_in_percent),
-        duration: (var-get loan_duration_in_days)
+        duration: (var-get loan_duration_in_days),
       })
       (if (>= credit_score_limit average_balance)
         (ok {
           message: "eligible for loan",
           loan_limit: average_balance,
           interest_rate: (var-get interest_rate_in_percent),
-          duration: (var-get loan_duration_in_days)
+          duration: (var-get loan_duration_in_days),
         })
         (ok {
           message: "eligible for loan",
           loan_limit: credit_score_limit,
           interest_rate: (var-get interest_rate_in_percent),
-          duration: (var-get loan_duration_in_days)
+          duration: (var-get loan_duration_in_days),
         })
       )
     )
@@ -523,12 +619,10 @@
   (ok {
     active_loan: (map-get? active_loans who),
     account_data: (map-get? account_data_map who),
-    repayment_amount_due: (repayment-amount-due who)
+    repayment_amount_due: (repayment-amount-due who),
   })
 )
 
 (define-read-only (get-block-height (who principal))
-  (ok {
-    stacks_block_height: stacks-block-height
-  })
+  (ok { stacks_block_height: stacks-block-height })
 )
