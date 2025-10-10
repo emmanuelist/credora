@@ -97,3 +97,56 @@
     tier_5_limit
   )
 )
+
+;; Scores on-chain activity (0-300 pts)
+(define-private (activity-score (average_balance uint))
+  (begin 
+    (asserts! (> average_balance u0) u0)
+    (asserts! (>= average_balance tier_0_limit) u100)
+    (asserts! (>= average_balance tier_1_limit) u220)
+    (asserts! (>= average_balance tier_2_limit) u240)
+    (asserts! (>= average_balance tier_3_limit) u260)
+    (asserts! (>= average_balance tier_4_limit) u280)
+    u300
+  )
+)
+
+;; Scores repayment history (0-700 pts)
+(define-private (repayment-score (total_loans uint) (on_time_loans uint) (late_loans uint))
+  (if (> on_time_loans u0)
+    (if (< total_loans u5)
+      (/ (* on_time_loans u700) (+ total_loans u5))
+      (/ (* on_time_loans u700) total_loans)
+    )
+    u0
+  )
+)
+
+;; Updates borrower stats and marks loan as paid
+(define-private (check-for-late-payment-and-update-data-after-payment (who principal))
+  (let (
+    (account_data (default-to 
+      { 
+        total_loans: u0,
+        on_time_loans: u0,
+        late_loans: u0
+      }
+      (map-get? account_data_map who)
+    ))
+    (due_block (default-to u0 (get due_block (map-get? active_loans who))))
+  ) 
+    (if (<= stacks-block-height due_block)
+      (map-set account_data_map who {
+        total_loans: (get total_loans account_data),
+        on_time_loans: (+ (get on_time_loans account_data) u1),
+        late_loans: (get late_loans account_data)
+      })
+      (map-set account_data_map who {
+        total_loans: (get total_loans account_data),
+        on_time_loans: (get on_time_loans account_data),
+        late_loans: (+ (get late_loans account_data) u1)
+      })
+    )
+    (map-delete active_loans who)
+  )
+)
