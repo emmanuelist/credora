@@ -221,3 +221,69 @@
     (ok true)
   )
 )
+
+;; Withdraw sBTC plus accrued interest
+(define-public (withdraw (amount uint)) 
+  (let (
+    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
+    (unlock_block (default-to u0 (get unlock_block (map-get? lender_info tx-sender))))
+    (locked_block (default-to u0 (get locked_block (map-get? lender_info tx-sender))))
+    (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))))
+    (lender_pool_balance 
+      (if (> lender_balance u0)
+        (/ 
+          (* lender_balance contract_balance) 
+          (if (> (var-get total_lending_pool) u0)
+            (var-get total_lending_pool)
+            u1
+          )
+        )
+        u0
+      )
+    )
+  )
+    (asserts! (> lender_balance u0) err_not_a_lender)
+    (asserts! (<= amount lender_pool_balance) err_pool_share_exceeded)
+    (asserts! (<= unlock_block stacks-block-height) err_funds_locked)
+    (try! (as-contract (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer amount tx-sender contract-caller none)))
+    (var-set total_lending_pool 
+      (if (< lender_balance amount)
+        (+ 
+          (- (var-get total_lending_pool) lender_balance)
+          (- lender_pool_balance amount)
+        )
+        (- (var-get total_lending_pool) amount)
+      )
+    )
+    (if (>= amount lender_balance)
+      (if (is-eq amount lender_pool_balance)
+        (map-delete lender_info tx-sender)
+        (map-set lender_info tx-sender 
+          {
+            balance: (- lender_pool_balance amount),
+            locked_block: locked_block,
+            unlock_block: unlock_block
+          }
+        )
+      )
+      (if (< lender_balance lender_pool_balance)
+        (map-set lender_info tx-sender 
+          {
+            balance: (- lender_pool_balance amount),
+            locked_block: locked_block,
+            unlock_block: unlock_block
+          }
+        )
+        (map-set lender_info tx-sender 
+          {
+            balance: (- lender_balance amount),
+            locked_block: locked_block,
+            unlock_block: unlock_block
+          }
+        )
+      )
+    )
+    (print {event: "withdrawal_sucessful", user: tx-sender, amount: amount})
+    (ok true)
+  )
+)
