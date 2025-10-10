@@ -446,3 +446,89 @@
     )
   )
 )
+
+(define-read-only (get-loan-limit-info (who principal))
+  (let (
+    (account_data (default-to {
+      total_loans: u0,
+      on_time_loans: u0,
+      late_loans: u0
+    } (map-get? account_data_map tx-sender)))
+    (total_loans (get total_loans account_data))
+    (on_time_loans (get on_time_loans account_data))
+    (late_loans (get late_loans account_data))
+    (average_balance (get-average-balance who))
+    (credit_score_limit (loan-limit (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance))))
+  )
+    (asserts! (is-eq total_loans (+ late_loans on_time_loans)) (ok {
+      credit_score: (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance)),
+      credit_score_limit: credit_score_limit,
+      average_balance: average_balance,
+      loan_limit: u0
+    }))
+    (asserts! (< average_balance credit_score_limit) (ok {
+      credit_score: (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance)),
+      credit_score_limit: credit_score_limit,
+      average_balance: average_balance,
+      loan_limit: credit_score_limit
+    }))
+    (ok {
+      credit_score: (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance)),
+      credit_score_limit: credit_score_limit,
+      average_balance: average_balance,
+      loan_limit: average_balance
+    })
+  )
+)
+
+(define-read-only (get-loan-eligibility-info (who principal))
+  (let (
+    (account_data (default-to {
+      total_loans: u0,
+      on_time_loans: u0,
+      late_loans: u0
+    } (map-get? account_data_map who)))
+    (total_loans (get total_loans account_data))
+    (on_time_loans (get on_time_loans account_data))
+    (late_loans (get late_loans account_data))
+    (average_balance (get-average-balance who))
+    (credit_score_limit (loan-limit (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance))))
+  )
+    (if (> total_loans (+ on_time_loans late_loans))
+      (ok {
+        message: "address has an unpaid loan",
+        loan_limit: u0,
+        interest_rate: (var-get interest_rate_in_percent),
+        duration: (var-get loan_duration_in_days)
+      })
+      (if (>= credit_score_limit average_balance)
+        (ok {
+          message: "eligible for loan",
+          loan_limit: average_balance,
+          interest_rate: (var-get interest_rate_in_percent),
+          duration: (var-get loan_duration_in_days)
+        })
+        (ok {
+          message: "eligible for loan",
+          loan_limit: credit_score_limit,
+          interest_rate: (var-get interest_rate_in_percent),
+          duration: (var-get loan_duration_in_days)
+        })
+      )
+    )
+  )
+)
+
+(define-read-only (get-borrower-info (who principal))
+  (ok {
+    active_loan: (map-get? active_loans who),
+    account_data: (map-get? account_data_map who),
+    repayment_amount_due: (repayment-amount-due who)
+  })
+)
+
+(define-read-only (get-block-height (who principal))
+  (ok {
+    stacks_block_height: stacks-block-height
+  })
+)
