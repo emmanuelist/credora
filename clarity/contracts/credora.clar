@@ -287,3 +287,79 @@
     (ok true)
   )
 )
+
+;; PUBLIC FUNCTIONS - Borrowing
+
+;; Request uncollateralized loan based on credit score
+(define-public (apply-for-loan (amount uint)) 
+  (let (
+    (account_data (default-to {
+      total_loans: u0,
+      on_time_loans: u0,
+      late_loans: u0
+    } (map-get? account_data_map tx-sender)))
+    (loan_duration_in_blocks (convert-days-to-blocks (var-get loan_duration_in_days)))
+  )
+    (asserts! (> amount u0) err_input_value_too_small)
+    (asserts! (loan-eligibility tx-sender account_data amount) err_not_eligible)
+    (asserts! (> (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))) amount) err_funds_not_available_now)
+    (try! (as-contract (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer amount tx-sender contract-caller none)))
+    (map-set active_loans tx-sender {
+      amount: amount,
+      due_block: (+ stacks-block-height loan_duration_in_blocks),
+      interest_rate: (var-get interest_rate_in_percent),
+      issued_block: stacks-block-height
+    })
+    (map-set account_data_map tx-sender {
+      total_loans: (+ u1 (get total_loans account_data)),
+      on_time_loans: (get on_time_loans account_data),
+      late_loans: (get late_loans account_data)
+    })
+    (print {
+      event: "loan_grant_sucessful", 
+      user: tx-sender, 
+      amount_to_repay: (repayment-amount-due tx-sender), 
+      amount: amount, 
+      due_block: (+ stacks-block-height loan_duration_in_blocks), 
+      interest_rate: (var-get interest_rate_in_percent), 
+      issued_block: stacks-block-height
+    })
+    (ok true)
+  )
+)
+
+;; Repay loan and update credit history
+(define-public (repay-loan (who principal))
+  (let (
+    (loan_data (default-to {
+      amount: u0,
+      due_block: u0,
+      interest_rate: u0,
+      issued_block: u0
+    } (map-get? active_loans who)))
+    (repayment_amount (repayment-amount-due who))
+  )
+    (asserts! (> (get amount loan_data) u0) err_not_eligible)
+    (try! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer repayment_amount tx-sender (as-contract tx-sender) none))
+    (check-for-late-payment-and-update-data-after-payment who)
+    (print {event: "loan_repaid_sucessfully", user: tx-sender, amount: repayment_amount})
+    (ok true)
+  )
+)
+
+;; PUBLIC FUNCTIONS - Admin Controls
+
+(define-public (set-admin (who principal))
+  (begin  
+    (asserts! (is-admin) err_not_admin)
+    (ok (var-set admin who))
+  )
+)
+
+(define-public (set-loan-duration-in-days (duration uint))
+  (begin
+    (asserts! (is-admin) err_not_admin)
+    (asserts! (>= duration u7) err_input_value_too_small)
+    (ok (var-set loan_duration_in_days duration))
+  )
+)
