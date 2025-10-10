@@ -363,3 +363,86 @@
     (ok (var-set loan_duration_in_days duration))
   )
 )
+
+(define-public (set-lock-duration-in-days (duration uint))
+  (begin
+    (asserts! (is-admin) err_not_admin)
+    (asserts! (> duration u0) err_input_value_too_small)
+    (ok (var-set lock_duration_in_days duration))
+  )
+)
+
+(define-public (set-interest-rate-in-percent (rate uint))
+  (begin
+    (asserts! (is-admin) err_not_admin)
+    (asserts! (> rate u0) err_input_value_too_small)
+    (ok (var-set interest_rate_in_percent rate))
+  )
+)
+
+;; READ-ONLY FUNCTIONS - Lending Pool
+
+(define-read-only (get-withdrawal-limit (lender principal))
+  (let (
+    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
+    (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))))
+    (lender_pool_balance 
+      (if (> lender_balance u0)
+        (/ 
+          (* lender_balance contract_balance) 
+          (if (> (var-get total_lending_pool) u0)
+            (var-get total_lending_pool)
+            u1
+          )
+        )
+        u0
+      )
+    )
+  )
+    (asserts! (> lender_balance u0) err_not_a_lender)
+    (ok {withdrawal_limit: lender_pool_balance})
+  )
+)
+
+(define-read-only (get-lending-pool-info)
+  (ok {
+    lock_duration_in_days: (var-get lock_duration_in_days),
+    pool_size: (var-get total_lending_pool),
+    contract_balance: (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender)))
+  })
+)
+
+(define-read-only (get-lender-info)
+  (let (
+    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
+    (contract_balance (unwrap-panic (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token get-balance (as-contract tx-sender))))
+    (locked_block (default-to u0 (get locked_block (map-get? lender_info tx-sender))))
+    (unlock_block (default-to u0 (get unlock_block (map-get? lender_info tx-sender))))
+  )
+    (ok {
+      lender_balance: lender_balance,
+      lender_pool_balance:  
+        (if (> lender_balance u0)
+          (/ (* lender_balance contract_balance) (var-get total_lending_pool))
+          u0
+        ),
+      locked_block: locked_block,
+      unlock_block: unlock_block,
+      time_in_pool_in_seconds: (/ (- stacks-block-height locked_block) (time-per-block))
+    })
+  )
+)
+
+;; READ-ONLY FUNCTIONS - Borrowing
+
+(define-read-only (repayment-amount-due (who principal))
+  (let (
+    (amount (default-to u0 (get amount (map-get? active_loans who))))
+    (interest_rate (default-to u0 (get interest_rate (map-get? active_loans who))))
+  )
+    (if (> interest_rate u0)
+      (+ amount (/ (* amount interest_rate) u100))
+      u0
+    )
+  )
+)
