@@ -150,3 +150,74 @@
     (map-delete active_loans who)
   )
 )
+
+;; Validates borrower eligibility via credit scoring algorithm
+(define-private (loan-eligibility 
+  (who principal)
+  (account_data {
+    total_loans: uint,
+    on_time_loans: uint,
+    late_loans: uint
+  })
+  (amount uint)
+)
+  (let (
+    (total_loans (get total_loans account_data))
+    (on_time_loans (get on_time_loans account_data))
+    (late_loans (get late_loans account_data))
+    (average_balance (get-average-balance who))
+  )
+    (if (is-eq total_loans u0)
+      (begin
+        (asserts! (is-eq (+ late_loans on_time_loans) total_loans) false)
+        (asserts! (>= average_balance amount) false)
+        (asserts! (>= (loan-limit (+ (activity-score average_balance) (repayment-score total_loans on_time_loans late_loans))) amount) false)
+        (map-set account_data_map who { 
+          total_loans: total_loans,
+          on_time_loans: on_time_loans,
+          late_loans: late_loans
+        })
+        true
+      )
+      (begin 
+        (asserts! (is-eq (+ late_loans on_time_loans) total_loans) false)
+        (asserts! (>= average_balance amount) false)
+        (asserts! (>= (loan-limit (+ (repayment-score total_loans on_time_loans late_loans) (activity-score average_balance))) amount) false)
+        (map-set account_data_map who {
+          total_loans: total_loans,
+          on_time_loans: on_time_loans,
+          late_loans: late_loans
+        })
+        true
+      )
+    )
+  ) 
+)
+
+;; PUBLIC FUNCTIONS - Lending Pool
+
+;; Deposit sBTC to earn yield
+(define-public (lend (amount uint))
+  (let (
+    (lender_balance (default-to u0 (get balance (map-get? lender_info tx-sender))))
+  ) 
+    (asserts! (>= amount u10000000) err_input_value_too_small)
+    (try! (contract-call? 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token transfer amount tx-sender (as-contract tx-sender) none))
+    (map-set lender_info tx-sender 
+      {
+        balance: (+ lender_balance amount), 
+        locked_block: stacks-block-height, 
+        unlock_block: (+ stacks-block-height (convert-days-to-blocks (var-get lock_duration_in_days)))
+      }
+    )
+    (var-set total_lending_pool (+ (var-get total_lending_pool) amount))
+    (print {
+      event: "lend_sucessful",
+      user: tx-sender,
+      amount: amount, 
+      locked_block: (default-to u0 (get locked_block (map-get? lender_info tx-sender))),
+      unlock_block: (default-to u0 (get unlock_block (map-get? lender_info tx-sender)))
+    })
+    (ok true)
+  )
+)
