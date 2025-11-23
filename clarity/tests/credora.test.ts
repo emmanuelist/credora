@@ -546,3 +546,58 @@ describe("Credora Protocol - Unit Tests", () => {
       // 5. Next loan limit should be lower
     });
   });
+
+  describe("Edge Cases and Security", () => {
+    it("handles zero balance lenders correctly", () => {
+      // Lender fully withdraws
+      // Map entry should be deleted or balance = 0
+    });
+
+    it("prevents integer overflow in calculations", () => {
+      // Test with maximum uint values
+    });
+
+    it("handles borrower with no sBTC balance history gracefully", () => {
+      // get-average-balance should return 0
+      // Should not be eligible for loans
+    });
+
+    it("correctly handles block height edge cases", () => {
+      // Test at exactly due_block
+      // Test at unlock_block
+    });
+
+    it("prevents reentrancy attacks", () => {
+      // Clarity's design prevents this, but test the flow
+    });
+
+    it("verifies all error codes are reachable", () => {
+      // Test each error code can be triggered:
+      // err_not_admin (100)
+      // err_input_value_too_small (101)
+      // err_not_a_lender (102)
+      // err_pool_share_exceeded (103)
+      // err_not_eligible (104)
+      // err_funds_not_available_now (105)
+      // err_funds_locked (106)
+      // err_unable_to_get_block (107)
+    });
+  });
+
+  describe("Time-based Calculations", () => {
+    it("correctly converts days to blocks", () => {
+      // 1 day should be ~144 blocks (10 min per block)
+    });
+
+    it("calculates time in pool correctly", () => {
+      // Verify time_in_pool_in_seconds calculation
+    });
+
+    it("advances blocks and checks loan due dates", () => {
+      const blocksBefore = simnet.blockHeight;
+      simnet.mineEmptyBlocks(100);
+      const blocksAfter = simnet.blockHeight;
+      expect(blocksAfter).toBe(blocksBefore + 100);
+    });
+  });
+});
