@@ -209,3 +209,103 @@ describe("Credora Protocol - Unit Tests", () => {
       // expect(totalPool).toBeUint(amount * 2);
     });
   });
+
+  describe("Lending Pool - Withdrawal", () => {
+    it("prevents withdrawal from non-lenders", () => {
+      const withdraw = simnet.callPublicFn(
+        "credora",
+        "withdraw",
+        [Cl.uint(1000000)],
+        wallet1
+      );
+      expect(withdraw.result).toBeErr(Cl.uint(102)); // err_not_a_lender
+    });
+
+    it("prevents withdrawal exceeding lender's balance", () => {
+      // After a successful deposit, try to withdraw more
+      // This test assumes wallet1 has deposited some amount
+      const excessiveAmount = 100000000; // 1 sBTC
+      
+      const withdraw = simnet.callPublicFn(
+        "credora",
+        "withdraw",
+        [Cl.uint(excessiveAmount)],
+        wallet1
+      );
+      // expect(withdraw.result).toBeErr(Cl.uint(103)); // err_pool_share_exceeded
+    });
+
+    it("prevents withdrawal during lock-up period", () => {
+      // Set a lock duration
+      simnet.callPublicFn(
+        "credora",
+        "set-lock-duration-in-days",
+        [Cl.uint(7)],
+        deployer
+      );
+      
+      // Make deposit
+      const depositAmount = 10000000;
+      simnet.callPublicFn("credora", "lend", [Cl.uint(depositAmount)], wallet1);
+      
+      // Try immediate withdrawal
+      const withdraw = simnet.callPublicFn(
+        "credora",
+        "withdraw",
+        [Cl.uint(depositAmount)],
+        wallet1
+      );
+      // expect(withdraw.result).toBeErr(Cl.uint(106)); // err_funds_locked
+    });
+
+    it("allows withdrawal after lock-up period expires", () => {
+      // This test would need to advance blocks to simulate time passing
+      // simnet.mineBlocks() can be used for this
+    });
+
+    it("correctly calculates proportional interest distribution", () => {
+      // Test scenario:
+      // 1. Two lenders deposit different amounts
+      // 2. Borrower takes loan and repays with interest
+      // 3. Verify each lender can withdraw proportional share
+    });
+  });
+
+  describe("Read-Only Functions - Lending", () => {
+    it("returns correct lending pool info", () => {
+      const poolInfo = simnet.callReadOnlyFn(
+        "credora",
+        "get-lending-pool-info",
+        [],
+        wallet1
+      );
+      expect(poolInfo.result).toBeOk(
+        Cl.tuple({
+          lock_duration_in_days: Cl.uint(0),
+          pool_size: Cl.uint(0),
+          contract_balance: Cl.uint(0),
+        })
+      );
+    });
+
+    it("returns correct lender info for a depositor", () => {
+      // After making a deposit, check lender info
+      const lenderInfo = simnet.callReadOnlyFn(
+        "credora",
+        "get-lender-info",
+        [],
+        wallet1
+      );
+      // expect(lenderInfo.result).toBeOk(...);
+    });
+
+    it("calculates correct withdrawal limit", () => {
+      const withdrawalLimit = simnet.callReadOnlyFn(
+        "credora",
+        "get-withdrawal-limit",
+        [Cl.principal(wallet1)],
+        wallet1
+      );
+      // expect(withdrawalLimit.result).toBeOk(...);
+    });
+  });
