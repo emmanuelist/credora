@@ -414,3 +414,71 @@ describe("Credora Protocol - Unit Tests", () => {
       );
       // expect(repay.result).toBeOk(Cl.bool(true));
     });
+
+    it("marks payment as on-time when repaid before due block", () => {
+      // Repay before due_block
+      // Check account_data_map.on_time_loans increments
+    });
+
+    it("marks payment as late when repaid after due block", () => {
+      // Mine blocks past due_block
+      // Repay loan
+      // Check account_data_map.late_loans increments
+    });
+
+    it("removes loan from active_loans after repayment", () => {
+      // After repayment, active_loans map should be empty for borrower
+    });
+
+    it("distributes interest to lenders proportionally", () => {
+      // Multiple lenders with different deposits
+      // After loan repayment with interest
+      // Verify each lender's withdrawable balance increased proportionally
+    });
+  });
+
+  describe("Credit Scoring System", () => {
+    it("calculates correct activity score for different balance tiers", () => {
+      // Test activity-score function for various balance levels
+      // Tier 0: < 10,000 sats = 0-100 points
+      // Tier 1: >= 50,000 sats = 220 points
+      // etc.
+    });
+
+    it("calculates correct repayment score for perfect history", () => {
+      // 100% on-time payments should give maximum 700 points
+    });
+
+    it("calculates correct repayment score for mixed history", () => {
+      // Test various combinations of on-time and late payments
+    });
+
+    it("gives new borrowers a boost with (total_loans + 5) formula", () => {
+      // First-time borrowers should get adjusted score
+    });
+
+    it("returns correct loan limit for different credit score ranges", () => {
+      // Score 0-300: tier_0_limit (10,000 sats)
+      // Score 301-450: tier_1_limit (50,000 sats)
+      // Score 451-600: tier_2_limit (100,000 sats)
+      // Score 601-750: tier_3_limit (300,000 sats)
+      // Score 751-900: tier_4_limit (500,000 sats)
+      // Score 901+: tier_5_limit (1,000,000 sats)
+    });
+  });
+
+  describe("Read-Only Functions - Borrowing", () => {
+    it("returns correct loan eligibility info for new borrower", () => {
+      const eligibilityInfo = simnet.callReadOnlyFn(
+        "credora",
+        "get-loan-eligibility-info",
+        [Cl.principal(wallet1)],
+        wallet1
+      );
+      // expect(eligibilityInfo.result).toBeOk(...);
+    });
+
+    it("returns 'has unpaid loan' message for borrower with active loan", () => {
+      // After loan approval, check eligibility
+      // Should show "address has an unpaid loan"
+    });
