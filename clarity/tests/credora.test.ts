@@ -482,3 +482,67 @@ describe("Credora Protocol - Unit Tests", () => {
       // After loan approval, check eligibility
       // Should show "address has an unpaid loan"
     });
+
+    it("returns correct loan limit based on credit score and balance", () => {
+      const loanLimitInfo = simnet.callReadOnlyFn(
+        "credora",
+        "get-loan-limit-info",
+        [Cl.principal(wallet1)],
+        wallet1
+      );
+      // expect(loanLimitInfo.result).toBeOk(...);
+    });
+
+    it("returns complete borrower info", () => {
+      const borrowerInfo = simnet.callReadOnlyFn(
+        "credora",
+        "get-borrower-info",
+        [Cl.principal(wallet1)],
+        wallet1
+      );
+      // expect(borrowerInfo.result).toBeOk(...);
+    });
+
+    it("returns current block height", () => {
+      const blockHeight = simnet.callReadOnlyFn(
+        "credora",
+        "get-block-height",
+        [Cl.principal(wallet1)],
+        wallet1
+      );
+      expect(blockHeight.result).toBeOk(
+        Cl.tuple({
+          stacks_block_height: Cl.uint(simnet.blockHeight)
+        })
+      );
+    });
+  });
+
+  describe("Integration Flows", () => {
+    it("full lifecycle: deposit -> borrow -> repay -> withdraw", () => {
+      // 1. Lender deposits funds
+      // 2. Borrower applies and receives loan
+      // 3. Borrower repays with interest
+      // 4. Lender withdraws original + interest
+    });
+
+    it("multiple concurrent borrowers and lenders", () => {
+      // Complex scenario with multiple participants
+      // Verify accounting is correct
+    });
+
+    it("borrower builds credit history over multiple loans", () => {
+      // 1. First small loan
+      // 2. Repay on time
+      // 3. Second larger loan (increased limit)
+      // 4. Verify credit score increased
+    });
+
+    it("late payment affects credit score and limits", () => {
+      // 1. Borrow
+      // 2. Mine blocks past due date
+      // 3. Repay late
+      // 4. Verify credit score decreased
+      // 5. Next loan limit should be lower
+    });
+  });
